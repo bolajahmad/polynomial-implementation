@@ -1,5 +1,7 @@
-pub trait PolynomialTrait {
+use ark_ff::PrimeField;
+
+pub trait PolynomialTrait<F: PrimeField> {
     // Gives the value of f(x) at the given value of x;
-    fn evaluate(&self, x: f64) -> f64;
-    fn interpolate(points: Vec<(f64, f64)>) -> Self;
+    fn evaluate(&self, x: F) -> F;
+    fn interpolate(points: Vec<(F, F)>) -> Self;
 }

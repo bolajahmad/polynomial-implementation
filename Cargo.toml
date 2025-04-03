@@ -1,5 +1,5 @@
 [workspace]
 resolver = "1"
-members = ["src/*"]
+members = ["polynomials", "shamir_secret_sharing_s"]
 
 exclude = []

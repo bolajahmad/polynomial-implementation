@@ -1,5 +1,7 @@
 use std::vec;
 
+use ark_ff::{One, PrimeField, Zero};
+use ark_bn254::Fq;
 use types::PolynomialTrait;
 
 pub mod types;
@@ -15,63 +17,50 @@ pub enum PolynomialError {
 // Smallest coeffifient first 
 // (ax^n + bx^(n-1) + ... cx + d) (d, c, ... , b, a)
 #[derive(Default, Debug, Clone)]
-pub struct Polynomials(Vec<f64>, u8);
+pub struct Polynomials<F: PrimeField>(Vec<F>);
 
-impl Polynomials {
-    pub fn new(coefficients: Vec<f64>, order: u8) -> Result<Self, PolynomialError> {
-        // The degree must not be less than the length of the coefficients
-        if coefficients.len() as u8 > order + 1 {
+impl<F: PrimeField> Polynomials<F> {
+    pub fn new(coefficients: Vec<F>) -> Result<Self, PolynomialError> {
+        // The length of the coefficients must be greater than 1
+        if coefficients.len() <= 0 {
             return Err(PolynomialError::DegreeError);
         }
 
-        if coefficients.len() == 0 {
-            return Err(PolynomialError::DegreeError);
-        }
-
-        Ok(Self(coefficients, order))
+        Ok(Self(coefficients))
     }
 
     // Returns the list of coefficients only
-    fn coefficients(&self) -> &Vec<f64> {
+    pub fn coefficients(&self) -> &Vec<F> {
         &self.0
     }
 
-    // Returns the degree of the polynomial
-    fn degree(&self) -> u8 {
-        self.1
-    }
-
     // Returns a more optimal value of the degree by elimination
-    fn true_degree(&self) -> u8 {
+    fn degree(&self) -> u8 {
         // Returns the first degree where the coefficient is not 0
-        let mut degree = if self.coefficients().len() <  self.degree() as usize {
-            self.coefficients().len() as u8
-        } else {
-            self.degree() + 1
-        };
+        let mut degree = (self.coefficients().len() - 1) as u8;
 
         // For each coefficient, reduce degree till encounter non-zero
         for i in 0..degree {
-            if self.coefficients()[i as usize] != 0.0 {
+            if self.coefficients()[i as usize] != Zero::zero() {
                 break;
             } else {
                 degree -= 1;
             }
         }
 
-        return degree - 1
+        return degree
     }
 
-    pub fn scalar_mul(&self, scalar: f64) -> Self {
-        Polynomials::new(self.coefficients().iter().map(|&x| (x * scalar).round()).collect(), self.degree()).unwrap()
+    pub fn scalar_mul(&self, scalar: F) -> Self {
+        Polynomials::new(self.coefficients().iter().map(|&x| (x * scalar)).collect()).unwrap()
     }
 
-    fn from_points(points: Vec<f64>, x: f64) -> (Self, f64) {
+    fn from_points(points: Vec<F>, x: F) -> (Self, F) {
         let numerator = points
             .iter()
             .filter(|&xi| x != *xi)
-            .map(|&xi| Polynomials::new(vec![-xi, 1.0], 1)
-            .unwrap()).collect::<Vec<Polynomials>>();
+            .map(|&xi| Polynomials::new(vec![-xi, One::one()])
+            .unwrap()).collect::<Vec<Polynomials<F>>>();
         let denominator = points
             .into_iter()
             .filter(|&xi| x != xi)
@@ -79,7 +68,7 @@ impl Polynomials {
             .reduce(|acc, curr| acc * curr)
             .unwrap();
 
-        let mut polynomial = Polynomials::new(vec![1.0], 1).unwrap();
+        let mut polynomial: Polynomials<F> = Polynomials::new(vec![One::one()]).unwrap();
         for poly in numerator.iter() {
             polynomial = &polynomial * poly;
         }
@@ -88,30 +77,29 @@ impl Polynomials {
     }
 }
 
-impl PolynomialTrait for Polynomials {
-    fn evaluate(&self, x: f64) -> f64 {
-        let mut result = 0.0;
+impl<F: PrimeField> PolynomialTrait<F> for Polynomials<F> {
+    fn evaluate(&self, x: F) -> F {
+        let mut result = Zero::zero();
+        let mut power = F::one();
 
         // Do a to_vec to pass ownership
         let mut coefficients = self.coefficients().to_vec();
         // reverse for more optimized manipulation
-        coefficients.reverse();
-        // Use the true_degree to avoid unnecessary computation
-        let mut i = self.true_degree() as i16;
+        // coefficients.reverse();
+        // let mut i = self.degree() + 1;
         
-        for coeff in coefficients.iter() {
-            if i < 0 {
-                break;
-            }
+        for (i, coeff) in coefficients.iter().enumerate() {
+            // let pow = if i > 0 {
+            //     x.pow(&[i as u64])
+            // } else {
+            //     One::one()
+            // };
 
-            let pow = if i > 0 {
-                x.powf(i as f64)
-            } else {
-                1.0
-            };
+            // println!("{}^{} = {}", x, i, pow);
 
-            result += coeff * pow;
-            i -= 1;
+            println!("Power of x, {:?}; coefficient {}", power, coeff);
+            result += *coeff * power;
+            power = power * x;
         }
 
         result
@@ -120,19 +108,14 @@ impl PolynomialTrait for Polynomials {
     // Should take an array of points of variable length
     // Point = (x: u32, y: u32)
     // The resulting polynomial cpefficient are rounded to the nearest integer
-    fn interpolate(points: Vec<(f64, f64)>) -> Self {
-        let mut interpolated_poly = Polynomials::new(vec![0.0], 0).unwrap();
+    fn interpolate(points: Vec<(F, F)>) -> Self {
+        let mut interpolated_poly = Polynomials::new(vec![Zero::zero()]).unwrap();
 
         for (x, y) in points.iter() {
             let (numerator, denominator) = Polynomials::from_points( 
                 points.iter().map(|(x, _)| *x).collect(), *x);
                 
-                println!("Numerator: {:?}", numerator);
-                println!("Denominator: {:?}", denominator);
-                println!("Y/denominator: {:?}", y / denominator);
-            
-            interpolated_poly = &interpolated_poly + &numerator.scalar_mul(y / denominator);
-            println!("Interpolated polynomial: {:?}", interpolated_poly);
+            interpolated_poly = &interpolated_poly + &numerator.scalar_mul(*y / denominator);
         }
 
         // Placeholder for interpolation logic
@@ -143,105 +126,76 @@ impl PolynomialTrait for Polynomials {
 
 #[cfg(test)]
 mod tests {
+    use ark_ff::{AdditiveGroup, Field};
+
     use super::*;
 
     #[test]
     fn should_initialize_polynomial() {
         // 3x + 5
         let poly_result = Polynomials::new(
-            vec![5.0, 3.0],
-            1
+            vec![Fq::from(5), Fq::from(3)]
         );
         assert!(poly_result.is_ok());
 
         let poly = poly_result.unwrap();
-        assert_eq!(poly.coefficients()[1], 3.0);
-        assert_eq!(poly.coefficients()[0], 5.0);
+        assert_eq!(poly.coefficients()[1], Fq::from(3));
+        assert_eq!(poly.coefficients()[0], Fq::from(5));
 
         // 3x^5 + 5x^3 - 7x - 5
         let poly_result = Polynomials::new(
-            vec![-5.0, -7.0, 0.0, 5.0, 0.0, 3.0],
-            5
+            vec![Fq::from(-5), Fq::from(-7), Zero::zero(), Fq::from(5), Zero::zero(), Fq::from(3)]
         );
         assert!(poly_result.is_ok());
         let poly = poly_result.unwrap();
-        assert_eq!(poly.coefficients()[5], 3.0);
-        assert_eq!(poly.coefficients()[4], 0.0);
-        assert_eq!(poly.coefficients()[1], -7.0);
+        assert_eq!(poly.coefficients()[5], Fq::from(3));
+        assert_eq!(poly.coefficients()[4], Fq::zero());
+        assert_eq!(poly.coefficients()[1], Fq::from(-7));
     }
 
     #[test]
     fn should_have_correct_degree() {
         // 3x + 5
         let poly = Polynomials::new(
-            vec![5.0, 3.0],
-            1
+            vec![Fq::from(5), Fq::from(3)]
         ).unwrap();
         assert_eq!(poly.degree(), 1);
 
         // 3x^5 + 5x^3 - 7x - 5
         let poly_result = Polynomials::new(
-            vec![0.0, 5.0, 3.0],
-            5
+            vec![Fq::from(-5), Fq::from(-7), Fq::ZERO, Fq::from(5), Fq::zero(), Fq::from(3)]
         );
         let poly = poly_result.unwrap();
         assert_eq!(poly.degree(), 5);
     }
 
     #[test]
-    fn should_have_true_degree() {
-        // 3x + 5
-        let poly = Polynomials::new(
-            vec![5.0, 3.0],
-            1
-        ).unwrap();
-        assert_eq!(poly.true_degree(), 1);
-
-        // 3x^5 + 5x^3 - 7x - 5
-        let poly = Polynomials::new(
-            vec![0.0, 5.0, 3.0],
-            5
-        ).unwrap();
-        assert_eq!(poly.true_degree(), 1);
-
-        // 3x^7 + 5x^3 - 7x - 5
-        let poly = Polynomials::new(
-            vec![-5.0, -7.0, 0.0, 5.0, 0.0, 0.0, 0.0, 3.0],
-            7
-        ).unwrap();
-        assert_eq!(poly.true_degree(), 7);
-    }
-
-    #[test]
     fn should_evaluate_polynomial() {
         // 3x + 5
         let poly = Polynomials::new(
-            vec![5.0, 3.0],
-            1
+            vec![Fq::from(5), Fq::from(3)]
         ).unwrap();
         // assert_eq!(poly.true_degree(), 1);
-        assert_eq!(poly.evaluate(2.0), 11.0);
-        assert_eq!(poly.evaluate(0.0), 5.0);
-        assert_eq!(poly.evaluate(-1.0), 2.0);
+        assert_eq!(poly.evaluate(Fq::from(2)), Fq::from(11));
+        assert_eq!(poly.evaluate(Fq::ZERO), Fq::from(5));
+        assert_eq!(poly.evaluate(Fq::from(-1)), Fq::from(2));
 
         // // 3x^5 + 5x^3 - 7x - 5
         let poly = Polynomials::new(
-            vec![-5.0, -7.0, 0.0, 5.0, 0.0, 3.0],
-            5
+            vec![Fq::from(-5), Fq::from(-7), Fq::ZERO, Fq::from(5), Fq::zero(), Fq::from(3)]
         ).unwrap();
-        assert_eq!(poly.evaluate(2.0), 117.0);
-        assert_eq!(poly.evaluate(10.0), 304925.0);
+        assert_eq!(poly.evaluate(Fq::from(2)), Fq::from(117));
+        assert_eq!(poly.evaluate(Fq::from(10)), Fq::from(304925));
     }
 
     #[test]
     fn should_interpolate_points() {
         let points = vec![
-            (1.0, 17.0), 
-            (2.0, 44.0), 
-            (4., 182.0), 
-            (5., 305.0)];
+            (Fq::ONE, Fq::from(17)), 
+            (Fq::from(2), Fq::from(44)), 
+            (Fq::from(4), Fq::from(182)), 
+            (Fq::from(5), Fq::from(305))];
         let poly = Polynomials::interpolate(points);
-        // assert_eq!(poly.coefficients(), &vec![10.0, -1.0, 7.0, 1.0]);
-        assert_eq!(poly.coefficients()[2], 7.0);
+        assert_eq!(poly.coefficients(), &vec![Fq::from(10), Fq::from(-1), Fq::from(7), Fq::one()]);
     }
 }
