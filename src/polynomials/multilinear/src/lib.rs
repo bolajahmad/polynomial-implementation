@@ -12,8 +12,9 @@ use num_bigint::{BigUint, ToBigUint};
 
 pub mod mocks;
 pub mod helper;
+pub mod arithmetics;
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct MultiLinearPolynomial<F: PrimeField> {
     variables: F,
     // variable_combination is a binary representation, 
@@ -95,6 +96,25 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
         }
         false
     }
+
+    fn fill_with_zero(&self) -> Self {
+        let mut new_coefficients = vec![];
+
+        for i in 0..self.combinations().into_bigint().to_bytes_le()[0] as usize {
+            if !self.coefficients.iter().any(|&(combination, _)| combination == i) {
+                new_coefficients.push((i, F::zero()));
+            }
+        }
+
+        Self::new(
+            self.variables,
+            new_coefficients
+        )
+    }
+
+    fn remove_zero_coefficients(&mut self) {
+        self.coefficients.retain(|&(_, coefficient)| coefficient != F::zero());
+    }
 }
 
 impl<F: PrimeField> MultiLinearPolynomial<F> {
@@ -152,6 +172,42 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
 
         *self = MultiLinearPolynomial::new(self.variables, new_coefficients);
         Ok(())
+    }
+
+    /**
+     * Takes a Vec of points (x, y) where x is the variable combination
+     * Should return a multilinear polynomial
+     * @params points: Vec<(usize, F)>, F here is the evaluation of the points
+     * @params variables: usize, the total number of variables
+     * @return: MultiLinearPolynomial<F>
+     * @example: points = [(0, 1), (1, 2), (2, 3)]
+     */
+    pub fn interpolate(points: Vec<(usize, F)>, variables: F) -> MultiLinearPolynomial<F> {
+        // let mut coefficients = vec![];
+        
+        // // Iterate through the points and create a new polynomial
+        // for (variable, yvalue) in points.iter() {
+        //     // y . if variable[i] == 1 (check_1) else (check_0)
+        //     // Get the variable combination
+        //     let variable_bits = format!("{:0width$b}", variable, width = variables);
+        //     let mut variable_product = MultiLinearPolynomial::default();
+            
+        //     for data in variable_bits.chars() {
+        //         if data == '1' {
+        //             // check_1
+        //             variable_product *= 1;
+        //         } else {
+        //             // check_0
+        //             variable_product *= 0;
+        //         }
+        //     }
+
+        //     // Add the coefficient to the coefficients vector
+        //     coefficients.push((variable_combination, coefficient));
+        // }
+
+        // MultiLinearPolynomial::new(F::from(points.len() as u128), coefficients)
+        unimplemented!()
     }
 }
 
