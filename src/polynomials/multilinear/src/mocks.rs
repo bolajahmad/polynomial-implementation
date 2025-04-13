@@ -4,7 +4,7 @@ use ark_ff::{PrimeField};
 use crate::MultiLinearPolynomial;
 
 pub fn multilinear_polya<F: PrimeField>() -> MultiLinearPolynomial<F> {
-    let variables = F::from(3);
+    let variables = 3usize;
     // f(a,b,c) = 2abc + 2ab + 3bc + 4
     let coefficients = vec![
         (0, F::from(4u128)),
@@ -17,7 +17,7 @@ pub fn multilinear_polya<F: PrimeField>() -> MultiLinearPolynomial<F> {
 }
 
 pub fn multilinear_polyb<F: PrimeField>() -> MultiLinearPolynomial<F> {
-    let variables = F::from(6);
+    let variables = 6usize;
     // f(a,b,c,d,e,f) = 2bcdf + 2abcf + 3bcd + 4abc + 9
     let coefficients = vec![
         (0, F::from(9u128)),

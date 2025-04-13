@@ -278,6 +278,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c19937216e9d3aa9956d9bb8dfc0b0c8beb6058fc4f7a4dc4d850edf86a237d6"
 
 [[package]]
+name = "multilinear"
+version = "0.1.0"
+dependencies = [
+ "ark-bn254",
+ "ark-ff",
+ "num-bigint",
+]
+
+[[package]]
 name = "num-bigint"
 version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -323,6 +332,7 @@ version = "0.1.0"
 dependencies = [
  "ark-bn254",
  "ark-ff",
+ "num-bigint",
 ]
 
 [[package]]

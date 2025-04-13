@@ -7,8 +7,9 @@
 // - Coefficients of each combination of the variables
 // The max degree is equal to the number of variables
 
+use ark_bn254::Fq;
 use ark_ff::{BigInteger, PrimeField};
-use num_bigint::{BigUint, ToBigUint};
+use num_bigint::BigUint;
 
 pub mod mocks;
 pub mod helper;
@@ -16,17 +17,18 @@ pub mod arithmetics;
 
 #[derive(Default, Debug)]
 pub struct MultiLinearPolynomial<F: PrimeField> {
-    variables: F,
+    // Number of variables is collected to avoid extra computation.
+    variables: usize,
     // variable_combination is a binary representation, 
-    coefficients: Vec<(usize, F)>       // Vec of tuple (variable_combination, coefficient)
+    // Vec of tuple (variable_combination, coefficient)
+    coefficients: Vec<(usize, F)>       
 }
 
-// 2ab + 3bc
-// ()
-
 impl<F: PrimeField> MultiLinearPolynomial<F> {
-    pub fn new(variables: F, coefficients: Vec<(usize, F)>) -> Self {
-        let exponent = BigUint::from_bytes_le(&variables.into_bigint().to_bytes_le());
+    pub fn new(variables: usize, coefficients: Vec<(usize, F)>) -> Self {
+        let exponent = BigUint::from(
+            variables as u64
+        );
         let combinations = BigUint::from(2u128).modpow(&exponent, &BigUint::from_bytes_le(&F::MODULUS.to_bytes_le()));
         
         if F::from(coefficients.len() as u128) > F::from(combinations) {
@@ -48,11 +50,16 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
         &self.coefficients
     }
 
-    pub fn combinations(&self) -> F {
-        let exponent = BigUint::from_bytes_le(&self.variables.into_bigint().to_bytes_le());
-        let combinations = BigUint::from(2u128).modpow(&exponent, &BigUint::from_bytes_le(&F::MODULUS.to_bytes_le()));
+    pub fn combinations(&self) -> Vec<u64> {
+        let exponent = BigUint::from(self.variables);
+        let combinations = BigUint::from(2u128)
+            .modpow(
+                &exponent, 
+                &BigUint::from_bytes_le
+                (&F::MODULUS.to_bytes_le())
+            ) - BigUint::from(1_u32);
 
-        F::from(combinations - 1.to_biguint().unwrap())
+        combinations.to_u64_digits()
     }
 
     pub fn degree(&self) -> F {
@@ -100,29 +107,18 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
         false
     }
 
-    fn fill_with_zero(&self) -> Self {
-        let mut new_coefficients = vec![];
-
-        for i in 0..self.combinations().into_bigint().to_bytes_le()[0] as usize {
-            if !self.coefficients.iter().any(|&(combination, _)| combination == i) {
-                new_coefficients.push((i, F::zero()));
-            }
-        }
-
-        Self::new(
-            self.variables,
-            new_coefficients
-        )
-    }
-
-    fn remove_zero_coefficients(&mut self) {
-        self.coefficients.retain(|&(_, coefficient)| coefficient != F::zero());
-    }
+    // fn remove_zero_coefficients(&mut self) {
+    //     self.coefficients.retain(|&(_, coefficient)| coefficient != F::zero());
+    // }
 }
 
 impl<F: PrimeField> MultiLinearPolynomial<F> {
     pub fn evaluate(&mut self, set: Vec<F>) -> F {
-        assert_eq!(self.variables, F::from(set.len() as u128), "Invalid number of variables");
+        assert_eq!(
+            F::from(self.variables as u64), 
+            F::from(set.len() as u128), 
+            "Invalid number of variables"
+        );
 
         for (i, value) in set.iter().enumerate() {
             // Do partial evaluation of the polynomial
@@ -134,13 +130,17 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
 
     pub fn partial_evaluate(&mut self, index: usize, value: F) -> Result<(), ()> {
         let mut new_coefficients = self.coefficients.clone();
-        let variable_count = self.variables.into_bigint().to_bytes_le();
+        let variable_count = self.variables;
 
         for (_, (variables, coefficient)) in self.coefficients.iter().enumerate() {
             // Check index of each variable
             // If index is 1 multiply coefficient by value and,
             // Switch the index to 0
-            let variable_bits = format!("{:0width$b}", variables, width = variable_count[0] as usize);
+            let variable_bits = format!(
+                "{:0width$b}", 
+                variables, 
+                width = variable_count
+            );
             let is_1_bit = match variable_bits.chars().nth(index) {
                 Some(bit) => bit == '1',
                 None => false,
@@ -149,7 +149,8 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
             if is_1_bit {
                 // clear the i-th bit
                 // let variable = clear_ith_bit(*variables as u64, index as u64) as usize;
-                let variable = variables & !(1 << (variable_count[0] as usize - 1 - index));
+                let variable = variables & !(1 << (variable_count - 1 - index));
+                println!("Variable: {}", variable);
                 // multiply coefficient by value
                 let coefficient = *coefficient * value;
 
@@ -180,46 +181,46 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
     /**
      * Takes a Vec of points (x, y) where x is the variable combination
      * Should return a multilinear polynomial
+     * We need the evaluation of each combination of the polynomial
      * @params points: Vec<(usize, F)>, F here is the evaluation of the points
      * @params variables: usize, the total number of variables
      * @return: MultiLinearPolynomial<F>
      * @example: points = [(0, 1), (1, 2), (2, 3)]
      */
-    pub fn interpolate(points: Vec<(usize, F)>, variables: F) -> MultiLinearPolynomial<F> {
-        // let mut coefficients = vec![];
+    pub fn interpolate(points: Vec<usize>, variables: usize) -> MultiLinearPolynomial<F> {
+        assert_eq!((points.len() as f64).log2(), variables as f64);
+        let mut coefficients = MultiLinearPolynomial::new(variables, vec![]);
         
         // // Iterate through the points and create a new polynomial
-        // for (variable, yvalue) in points.iter() {
-        //     // y . if variable[i] == 1 (check_1) else (check_0)
-        //     // Get the variable combination
-        //     let variable_bits = format!("{:0width$b}", variable, width = variables);
-        //     let mut variable_product = MultiLinearPolynomial::default();
-            
-        //     for data in variable_bits.chars() {
-        //         if data == '1' {
-        //             // check_1
-        //             variable_product *= 1;
-        //         } else {
-        //             // check_0
-        //             variable_product *= 0;
-        //         }
-        //     }
+        for (index, coefficient) in points.iter().enumerate() {
+            // y . if variable[i] == (1 - a) (check_1) else (a)
+            // Get the variable combination
+            let variable_bits = format!("{:0width$b}", index, width = variables);
+            let mut variable_product = MultiLinearPolynomial::new(variables, vec![(0, F::ONE)]);
+            for (bit, data) in variable_bits.chars().enumerate() {
+                if data == '1' {
+                    // check_1
+                    variable_product = &variable_product * &MultiLinearPolynomial::new(variables, [(0, F::ZERO), (2usize.pow(bit as u32), F::from(1))].to_vec());
+                } else {
+                    // check_0
+                    variable_product = &variable_product * &MultiLinearPolynomial::new(variables, [(0, F::ONE), (2usize.pow(bit as u32), F::from(-1))].to_vec());
+                }
+            }
 
-        //     // Add the coefficient to the coefficients vector
-        //     coefficients.push((variable_combination, coefficient));
-        // }
-
-        // MultiLinearPolynomial::new(F::from(points.len() as u128), coefficients)
-        unimplemented!()
+            coefficients = &coefficients + &variable_product.scalar_mul(F::from(*coefficient as u64));
+        }
+        
+        coefficients
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::mocks::{multilinear_polya, multilinear_polyb};
-    use super::*;
+    use crate::{mocks::{multilinear_polya, multilinear_polyb}, MultiLinearPolynomial};
+    // use super::*;
 
     use ark_bn254::Fq;
+    use ark_ff::{Field, PrimeField};
 
     #[test]
     fn should_initialize_multilinear_polynomial() {
@@ -249,20 +250,38 @@ mod tests {
 
     #[test]
     fn should_evaluate_polynomial() {
-        // 2abc + 2ab + 3bc + 4
-        let mut poly_a = multilinear_polyb::<Fq>();
+    // f(a,b,c,d,e,f) = 2bcdf + 2abcf + 3bcd + 4abc + 9
+    // 4bdf + 4abf + 6bd + 8ab + 9
+    let coefficients = vec![
+        (0, Fq::from(9u128)),
+        (28, Fq::from(3u128)),
+        (29, Fq::from(2u128)),
+        (56, Fq::from(4u128)),
+        (57, Fq::from(2u128)),
+    ];
+    let mut poly = MultiLinearPolynomial::new(6, coefficients);
+    let _ = poly.partial_evaluate(2, Fq::from(2));
 
-        // define the evaluating set on each variable
-        let set = vec![
-            Fq::from(2),
-            Fq::from(3),
-            Fq::from(4),
-            Fq::from(2),
-            Fq::from(3),
-            Fq::from(4),
-        ];
-        let result = poly_a.partial_evaluate(2, Fq::from(2));
-
-        // assert_eq!(result, Fq::from(0));
+    assert_eq!(poly.coefficients()[4].1, Fq::from(4));
+    assert_eq!(poly.coefficients()[2].0, 21);
+    }
+    
+    #[test]
+    fn should_interpolate_polynomial() {
+         // f(a,b) = 2a + 3b - 5ab + 6
+         let polynomial: MultiLinearPolynomial<Fq> = MultiLinearPolynomial::interpolate(
+            vec![6, 9, 8, 6], 
+            2
+        );
+        assert_eq!(polynomial.coefficients().len(), 4);
+        assert_eq!(polynomial.coefficients()[3].1, Fq::from(-5));
+        
+        // let poly = f(a,b,c) = 3ab + 12abc - 4bc - c + 15
+        let polynomial: MultiLinearPolynomial<Fq> = MultiLinearPolynomial::interpolate(
+            vec![15, 14, 15, 10, 15, 14, 18, 25], 3
+        );
+        assert_eq!(polynomial.coefficients().len(), 5);
+        assert_eq!(polynomial.coefficients()[4].1, Fq::from(12));
+        assert_eq!(polynomial.coefficients()[3].1, Fq::from(-4));
     }
 }
