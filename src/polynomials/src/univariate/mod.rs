@@ -1,7 +1,6 @@
 use std::vec;
 
 use ark_ff::{One, PrimeField, Zero};
-use ark_bn254::Fq;
 use types::PolynomialTrait;
 
 pub mod types;
@@ -51,7 +50,7 @@ impl<F: PrimeField> Polynomials<F> {
         return degree
     }
 
-    pub fn scalar_mul(&self, scalar: F) -> Self {
+    pub fn scalar_mul(&self, scalar: F) -> Polynomials<F> {
         Polynomials::new(self.coefficients().iter().map(|&x| (x * scalar)).collect()).unwrap()
     }
 
@@ -83,20 +82,10 @@ impl<F: PrimeField> PolynomialTrait<F> for Polynomials<F> {
         let mut power = F::one();
 
         // Do a to_vec to pass ownership
-        let mut coefficients = self.coefficients().to_vec();
+        let coefficients = self.coefficients().to_vec();
         // reverse for more optimized manipulation
-        // coefficients.reverse();
-        // let mut i = self.degree() + 1;
         
-        for (i, coeff) in coefficients.iter().enumerate() {
-            // let pow = if i > 0 {
-            //     x.pow(&[i as u64])
-            // } else {
-            //     One::one()
-            // };
-
-            // println!("{}^{} = {}", x, i, pow);
-
+        for (_, coeff) in coefficients.iter().enumerate() {
             println!("Power of x, {:?}; coefficient {}", power, coeff);
             result += *coeff * power;
             power = power * x;
@@ -126,6 +115,7 @@ impl<F: PrimeField> PolynomialTrait<F> for Polynomials<F> {
 
 #[cfg(test)]
 mod tests {
+    use ark_bn254::Fq;
     use ark_ff::{AdditiveGroup, Field};
 
     use super::*;
