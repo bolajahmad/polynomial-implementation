@@ -1,7 +1,7 @@
 use ark_bn254::Fq;
 use ark_ff::{PrimeField};
 
-use crate::MultiLinearPolynomial;
+use super::MultiLinearPolynomial;
 
 pub fn multilinear_polya<F: PrimeField>() -> MultiLinearPolynomial<F> {
     let variables = 3usize;

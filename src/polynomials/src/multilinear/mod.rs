@@ -216,7 +216,7 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{mocks::{multilinear_polya, multilinear_polyb}, MultiLinearPolynomial};
+    use super::{mocks::{multilinear_polya, multilinear_polyb}, MultiLinearPolynomial};
     // use super::*;
 
     use ark_bn254::Fq;

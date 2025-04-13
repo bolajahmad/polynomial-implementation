@@ -3,7 +3,8 @@ use std::ops::{Add, Mul};
 use ark_bn254::Fq;
 use ark_ff::{BigInteger, PrimeField};
 
-use crate::MultiLinearPolynomial;
+use super::MultiLinearPolynomial;
+
 
 impl<F: PrimeField> Add for &MultiLinearPolynomial<F> {
     type Output = MultiLinearPolynomial<F>;

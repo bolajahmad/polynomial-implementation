@@ -1,6 +1,6 @@
 use ark_ff::PrimeField;
 use ark_bn254::Fq;
-use polynomials::{Polynomials, types::PolynomialTrait};
+use polynomials::univariate::{types::PolynomialTrait, Polynomials};
 use rand::Rng;
 
 pub struct ShamirSecret {

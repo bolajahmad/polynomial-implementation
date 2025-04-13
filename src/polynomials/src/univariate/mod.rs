@@ -1,7 +1,6 @@
 use std::vec;
 
 use ark_ff::{One, PrimeField, Zero};
-use ark_bn254::Fq;
 use types::PolynomialTrait;
 
 pub mod types;
@@ -51,7 +50,7 @@ impl<F: PrimeField> Polynomials<F> {
         return degree
     }
 
-    pub fn scalar_mul(&self, scalar: F) -> Self {
+    pub fn scalar_mul(&self, scalar: F) -> Polynomials<F> {
         Polynomials::new(self.coefficients().iter().map(|&x| (x * scalar)).collect()).unwrap()
     }
 
@@ -116,6 +115,7 @@ impl<F: PrimeField> PolynomialTrait<F> for Polynomials<F> {
 
 #[cfg(test)]
 mod tests {
+    use ark_bn254::Fq;
     use ark_ff::{AdditiveGroup, Field};
 
     use super::*;

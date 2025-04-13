@@ -2,7 +2,7 @@ use std::ops::{Add, Mul};
 
 use ark_ff::{PrimeField, Zero};
 
-use crate::Polynomials;
+use super::Polynomials;
 
 impl<F: PrimeField> Add for &Polynomials<F> {
     type Output = Polynomials<F>;
@@ -54,7 +54,6 @@ mod tests {
     use ark_bn254::Fq;
 
     use super::*;
-    use crate::Polynomials;
 
     #[test]
     fn should_add_polynomials() {
