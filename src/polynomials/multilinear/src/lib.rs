@@ -21,6 +21,9 @@ pub struct MultiLinearPolynomial<F: PrimeField> {
     coefficients: Vec<(usize, F)>       // Vec of tuple (variable_combination, coefficient)
 }
 
+// 2ab + 3bc
+// ()
+
 impl<F: PrimeField> MultiLinearPolynomial<F> {
     pub fn new(variables: F, coefficients: Vec<(usize, F)>) -> Self {
         let exponent = BigUint::from_bytes_le(&variables.into_bigint().to_bytes_le());
