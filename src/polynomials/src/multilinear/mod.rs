@@ -9,6 +9,7 @@
 
 use ark_bn254::Fq;
 use ark_ff::{BigInteger, PrimeField};
+use helper::{check_is_1_bit, clear_ith_bit};
 use num_bigint::BigUint;
 
 pub mod mocks;
@@ -136,20 +137,11 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
             // Check index of each variable
             // If index is 1 multiply coefficient by value and,
             // Switch the index to 0
-            let variable_bits = format!(
-                "{:0width$b}", 
-                variables, 
-                width = variable_count
-            );
-            let is_1_bit = match variable_bits.chars().nth(index) {
-                Some(bit) => bit == '1',
-                None => false,
-            };
-            
-            if is_1_bit {
+            let index = (variable_count - 1) - index;
+            if check_is_1_bit(*variables as u64, index) {
                 // clear the i-th bit
                 // let variable = clear_ith_bit(*variables as u64, index as u64) as usize;
-                let variable = variables & !(1 << (variable_count - 1 - index));
+                let variable = clear_ith_bit(*variables as u64, index) as usize;
                 println!("Variable: {}", variable);
                 // multiply coefficient by value
                 let coefficient = *coefficient * value;
@@ -194,19 +186,21 @@ impl<F: PrimeField> MultiLinearPolynomial<F> {
         // // Iterate through the points and create a new polynomial
         for (index, coefficient) in points.iter().enumerate() {
             // y . if variable[i] == (1 - a) (check_1) else (a)
-            // Get the variable combination
-            let variable_bits = format!("{:0width$b}", index, width = variables);
+            // Get the variable combinationvariables);
             let mut variable_product = MultiLinearPolynomial::new(variables, vec![(0, F::ONE)]);
-            for (bit, data) in variable_bits.chars().enumerate() {
-                if data == '1' {
-                    // check_1
-                    variable_product = &variable_product * &MultiLinearPolynomial::new(variables, [(0, F::ZERO), (2usize.pow(bit as u32), F::from(1))].to_vec());
-                } else {
-                    // check_0
-                    variable_product = &variable_product * &MultiLinearPolynomial::new(variables, [(0, F::ONE), (2usize.pow(bit as u32), F::from(-1))].to_vec());
+            let is_1_bit = check_is_1_bit(variables as u64, index);
+            match is_1_bit {
+                true => {
+                    variable_product = &variable_product * &MultiLinearPolynomial::new(
+                        variables, [(0, F::ZERO), 
+                        (2usize.pow(index as u32), F::from(1))].to_vec())
+                    },
+                false => {
+                    variable_product = &variable_product * &MultiLinearPolynomial::new(
+                        variables, 
+                        [(0, F::ONE), (2usize.pow(index as u32), F::from(-1))].to_vec())
                 }
-            }
-
+            };
             coefficients = &coefficients + &variable_product.scalar_mul(F::from(*coefficient as u64));
         }
         
