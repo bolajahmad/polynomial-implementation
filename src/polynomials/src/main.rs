@@ -36,15 +36,25 @@ fn main() {
     let id = 3;
     let idx = (max_variables - 1) - id;
 
-    // println!("Value: {}", value ^ (1 << idx));
+    // // println!("Value: {}", value ^ (1 << idx));
 
-    // loop_through();
-    // println!("1 shofted idx {} times: {}", 2, 1 << 1 );
-    // println!("Character at ith index: {}", 1 << 4);
-    println!("Number after clearing ith bit at index {} is {}", idx, clear_ith_bit(value, idx));
+    // // loop_through();
+    // // println!("1 shofted idx {} times: {}", 2, 1 << 1 );
+    // // println!("Character at ith index: {}", 1 << 4);
+    // println!("Number after clearing ith bit at index {} is {}", idx, clear_ith_bit(value, idx));
 
-    if check_is_1_bit(value, idx) {
-        println!("Bit at index {} is 1", idx);
-        println!("Number after clearing ith bit at index {} is {}", idx, clear_ith_bit(value, idx));
-    }
+    // if check_is_1_bit(value, idx) {
+    //     println!("Bit at index {} is 1", idx);
+    //     println!("Number after clearing ith bit at index {} is {}", idx, clear_ith_bit(value, idx));
+    // }
+
+
+    // f(a,b) = 2ab + 3a + b
+    // f(2, 5) = 31
+    // f(3,4) = 40
+
+    // 00, 01, 10, 11
+    // [2, 5, 6, 10]
+
+    // degree = x, x+1
 }
